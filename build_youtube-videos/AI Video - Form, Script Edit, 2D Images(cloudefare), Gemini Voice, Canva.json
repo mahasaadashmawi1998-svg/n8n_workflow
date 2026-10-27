@@ -1,0 +1,823 @@
+{
+  "name": "AI Video - Form, Script Edit, 2D Images, Gemini Voice, Canva",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "=https://image.pollinations.ai/prompt/{{ encodeURIComponent($json.image_prompt) }}?width=1080&height=1920&model=flux&nologo=true&seed={{ $json.scene }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 16000
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "image"
+            }
+          },
+          "timeout": 180000
+        }
+      },
+      "name": "Pollinations - 2D Illustration",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2048,
+        1008
+      ],
+      "id": "ca215d98-74bf-4eb3-a20a-4bf3f384eb0b",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 16000
+    },
+    {
+      "parameters": {
+        "content": "## AI Video → Canva\n**Form → Gemini script → YOU EDIT → 2D images using cloudefare fluxschnell + Gemini voice per scene → upload to Canva**\n\n1. Fill keys in **Config** (Gemini key, Canva access token)\n2. Click **Execute workflow** / open the Form Trigger test URL\n3. Review the script on the edit page, change it or leave blank to approve\n4. Final page gives you the Canva design link\n\nCanva tokens from the Connect API expire (~4h). Later switch to an OAuth2 credential.",
+        "height": 300,
+        "width": 520
+      },
+      "name": "Setup Notes1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        640,
+        656
+      ],
+      "id": "07b7bc2c-da9d-49c5-ad0e-a180df6656f1"
+    },
+    {
+      "parameters": {
+        "content": "## Canva limits\nThe Canva Connect API can upload images/audio and create a design, but it cannot build a multi-page video timeline.\n\nThis workflow uploads every scene image + voice to Canva Uploads and creates a 1080x1920 design starting with scene 1.\n\nIf you have **Canva Enterprise** + a Brand Template, enable the two disabled Autofill nodes to fill all pages with images + captions. Voice files are then dragged onto pages in Canva.",
+        "height": 300,
+        "width": 520
+      },
+      "name": "Canva Notes1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1216,
+        640
+      ],
+      "id": "a697d93a-15af-4d45-83f4-7656bba94e1d"
+    },
+    {
+      "parameters": {
+        "formTitle": "AI Video Generator",
+        "formDescription": "Enter a topic. I will write the script, you can edit it, then I build the scenes.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Topic",
+              "placeholder": "e.g. 5 facts about the pyramids",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Number of scenes",
+              "fieldType": "number",
+              "placeholder": "5"
+            },
+            {
+              "fieldLabel": "Voice",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Kore"
+                  },
+                  {
+                    "option": "Puck"
+                  },
+                  {
+                    "option": "Charon"
+                  },
+                  {
+                    "option": "Aoede"
+                  },
+                  {
+                    "option": "Zephyr"
+                  },
+                  {
+                    "option": "Fenrir"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Start - Topic Form1",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.3,
+      "position": [
+        704,
+        1120
+      ],
+      "id": "ca3c6a22-abf8-4cbf-94fc-075daca47d40",
+      "webhookId": "2a6d898b-387b-4520-9d52-a98d357e68c8"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "topic",
+              "value": "={{ $json.Topic }}",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "scene_count",
+              "value": "={{ $json['Number of scenes'] || 5 }}",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "voice",
+              "value": "={{ $json.Voice || 'Kore' }}",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "style",
+              "value": "Flat 2D vector illustration, storybook style, bold clean outlines, vibrant colors, simple shapes, vertical 9:16 composition, no text or letters in the image.",
+              "type": "string"
+            },
+            {
+              "id": "a5",
+              "name": "gemini_api_key",
+              "value": "put_gemini_api_key",
+              "type": "string"
+            },
+            {
+              "id": "a6",
+              "name": "canva_access_token",
+              "value": "https://api.canva.com/rest/v1/oauth/token",
+              "type": "string"
+            },
+            {
+              "id": "a7",
+              "name": "canva_brand_template_id",
+              "value": "OPTIONAL_ENTERPRISE_BRAND_TEMPLATE_ID",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Config1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        928,
+        1120
+      ],
+      "id": "246894c7-b664-492d-bd91-539b59c6850d"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-goog-api-key",
+              "value": "={{ $('Config1').first().json.gemini_api_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  contents: [{ parts: [{ text: \"Write an English narration script for a short vertical video about: \" + $json.topic + \". Use exactly \" + $json.scene_count + \" scenes. Return JSON only in this shape: {\\\"title\\\": \\\"string\\\", \\\"character_description\\\": \\\"one sentence describing the main character or visual motif so every image looks consistent\\\", \\\"scenes\\\": [{\\\"script\\\": \\\"1-2 sentences of narration\\\", \\\"image_prompt\\\": \\\"detailed description of the scene to illustrate\\\", \\\"on_screen_text\\\": \\\"max 6 words\\\"}]}\" }] }],\n  generationConfig: { responseMimeType: \"application/json\" }\n}) }}",
+        "options": {}
+      },
+      "name": "Gemini - Write Script1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1152,
+        1120
+      ],
+      "id": "17ee2316-6bb3-4b1d-8008-943206244b91",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.candidates[0].content.parts[0].text;\nconst data = JSON.parse(raw.replace(/```json|```/g, '').trim());\nconst esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst pretty = JSON.stringify(data, null, 2);\nconst html = '<p>Review the generated script below. To change anything, copy the JSON, edit it, and paste it into the box. Leave the box empty to approve it as is.</p><pre style=\"white-space:pre-wrap;text-align:left\">' + esc(pretty) + '</pre>';\nreturn [{ json: { data, html } }];"
+      },
+      "name": "Format Script for Edit1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        1120
+      ],
+      "id": "2e652ec9-40b5-4657-a575-5f85bdba1926"
+    },
+    {
+      "parameters": {
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Edited script JSON (optional)",
+              "fieldType": "textarea",
+              "placeholder": "Paste edited JSON here, or leave empty to approve"
+            }
+          ]
+        },
+        "options": {
+          "formTitle": "Review your script",
+          "formDescription": "={{ $json.html }}",
+          "buttonLabel": "Approve & generate scenes"
+        }
+      },
+      "name": "Review & Edit Script1",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.3,
+      "position": [
+        1584,
+        1120
+      ],
+      "id": "0f0512a7-8106-43ea-8614-50aaa17d12c7",
+      "webhookId": "e1c5625a-8457-4fc2-b21d-9449888427f2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const original = $('Format Script for Edit1').first().json.data;\nconst edited = String($json['Edited script JSON (optional)'] || '').trim();\nlet data = original;\nif (edited) { data = JSON.parse(edited.replace(/```json|```/g, '').trim()); }\nconst cfg = $('Config1').first().json;\nconst character = data.character_description || original.character_description || '';\nreturn data.scenes.map((s, i) => ({\n  json: {\n    scene: i + 1,\n    title: data.title,\n    script: s.script,\n    on_screen_text: s.on_screen_text,\n    image_prompt: s.image_prompt + '. Main character: ' + character + '. ' + cfg.style\n  }\n}));"
+      },
+      "name": "Apply Edits & Split Scenes1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1808,
+        1120
+      ],
+      "id": "1c0f2a19-f928-45b7-87b2-c45442e2a1ae"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const scene = $('Apply Edits & Split Scenes1').item.json;\nif (!$binary || !$binary.image) throw new Error('No image returned for scene ' + scene.scene);\nreturn { json: scene, binary: { image: $binary.image } };"
+      },
+      "name": "Extract Image1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2272,
+        1008
+      ],
+      "id": "1ad4e368-177c-4841-bd7f-46ef0059f20f"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-goog-api-key",
+              "value": "={{ $('Config1').first().json.gemini_api_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  contents: [{ parts: [{ text: \"Say in a clear, warm narrator voice: \" + $json.script }] }],\n  generationConfig: {\n    responseModalities: [\"AUDIO\"],\n    speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: $('Config1').first().json.voice } } }\n  }\n}) }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 5000
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "name": "Gemini - Voice (TTS)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2032,
+        1200
+      ],
+      "id": "2ea433e2-ba51-406f-b886-8ef89229d159",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 6000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const parts = $json.candidates[0].content.parts;\nconst p = parts.find(x => x.inlineData || x.inline_data);\nconst scene = $('Apply Edits & Split Scenes1').item.json;\nif (!p) throw new Error('No audio returned for scene ' + scene.scene);\nconst d = p.inlineData || p.inline_data;\nconst pcm = Buffer.from(d.data, 'base64');           // 24 kHz, 16-bit, mono PCM\nconst h = Buffer.alloc(44);\nh.write('RIFF', 0); h.writeUInt32LE(36 + pcm.length, 4); h.write('WAVE', 8);\nh.write('fmt ', 12); h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22);\nh.writeUInt32LE(24000, 24); h.writeUInt32LE(48000, 28); h.writeUInt16LE(2, 32); h.writeUInt16LE(16, 34);\nh.write('data', 36); h.writeUInt32LE(pcm.length, 40);\nconst bin = await this.helpers.prepareBinaryData(Buffer.concat([h, pcm]), 'scene_' + scene.scene + '.wav', 'audio/wav');\nreturn { json: scene, binary: { audio: bin } };"
+      },
+      "name": "Make WAV1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2256,
+        1200
+      ],
+      "id": "142cc576-6a4c-4288-b5ca-e9da47e3e4cd"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "name": "Merge Image + Voice1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        2480,
+        1120
+      ],
+      "id": "e47cd086-86dc-47ad-ad3b-374db6dbe241"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst out = [];\nfor (const it of items) {\n  const n = String(it.json.scene).padStart(2, '0');\n  for (const kind of ['image', 'audio']) {\n    const name = 'scene_' + n + '_' + kind;\n    out.push({\n      json: { scene: it.json.scene, kind, asset_name: name, name_base64: Buffer.from(name).toString('base64') },\n      binary: { data: it.binary[kind] }\n    });\n  }\n}\nreturn out;"
+      },
+      "name": "Prepare Files for Canva1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2704,
+        1120
+      ],
+      "id": "daec2b94-a91b-4c5f-84d2-358d95583da7"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.canva.com/rest/v1/asset-uploads",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/octet-stream"
+            },
+            {
+              "name": "Asset-Upload-Metadata",
+              "value": "={{ JSON.stringify({ name_base64: $json.name_base64 }) }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 2500
+            }
+          }
+        }
+      },
+      "name": "Canva - Upload Asset1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2928,
+        1120
+      ],
+      "id": "c53d8924-d15c-47fe-bd02-796222c7d6d0",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "amount": 3
+      },
+      "name": "Wait 3s1",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3152,
+        1120
+      ],
+      "id": "21871782-71f7-49ef-b60c-43ba4667bfec",
+      "webhookId": "50563571-1538-40f2-b198-3ff3f28bd768"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.canva.com/rest/v1/asset-uploads/{{ $json.job.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {}
+      },
+      "name": "Canva - Get Upload Job1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3360,
+        1120
+      ],
+      "id": "2d7b7534-5021-4c14-ad8a-c4db31c02c82",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "A3mOsL0s93JHY37P",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.job.status }}",
+              "rightValue": "in_progress",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Upload Finished?1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3584,
+        1120
+      ],
+      "id": "69be4be3-3d38-4264-a7b6-d454eb9e9064"
+    },
+    {
+      "parameters": {
+        "jsCode": "const map = {};\nfor (const it of $input.all()) {\n  const job = it.json.job;\n  if (job.status !== 'success') throw new Error('Canva upload failed: ' + JSON.stringify(job.error || job));\n  const m = /scene_(\\d+)_(image|audio)/.exec(job.asset.name);\n  if (!m) continue;\n  const n = parseInt(m[1], 10);\n  map[n] = map[n] || { scene: n };\n  map[n][m[2] + '_asset_id'] = job.asset.id;\n}\nconst info = $('Apply Edits & Split Scenes1').all().map(i => i.json);\nconst scenes = Object.values(map).sort((a, b) => a.scene - b.scene).map(s => ({\n  ...s, caption: info[s.scene - 1].on_screen_text, script: info[s.scene - 1].script\n}));\nreturn [{ json: { title: info[0].title, scenes } }];"
+      },
+      "name": "Collect Canva Assets1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3808,
+        1120
+      ],
+      "id": "34c1594b-5d4f-48c5-b06c-a0d1d14ea52d"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.canva.com/rest/v1/designs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  design_type: { type: \"custom\", width: 1080, height: 1920 },\n  asset_id: $json.scenes[0].image_asset_id,\n  title: $json.title\n}) }}",
+        "options": {}
+      },
+      "name": "Canva - Create Design1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4032,
+        1120
+      ],
+      "id": "1705505d-0c5b-4fb0-aed5-cc3b9a2cf9eb"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "completionTitle": "Your Canva design is ready",
+        "completionMessage": "={{ 'Open your design: ' + $json.design.urls.edit_url + ' | Every scene image and voice file is in your Canva Uploads as scene_01_image, scene_01_audio, and so on. Drag each voice file onto its page.' }}",
+        "options": {}
+      },
+      "name": "Done - Show Canva Link1",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.3,
+      "position": [
+        4240,
+        1120
+      ],
+      "id": "a357e869-8c07-4c1b-a250-1256d0861f7c",
+      "webhookId": "bfb14c4e-7d28-48fe-bea1-7714dbdf3159"
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nconst data = {};\nfor (const s of d.scenes) {\n  data['scene_' + s.scene + '_image'] = { type: 'image', asset_id: s.image_asset_id };\n  data['scene_' + s.scene + '_text'] = { type: 'text', text: s.caption };\n}\nreturn [{ json: { body: { brand_template_id: $('Config1').first().json.canva_brand_template_id, title: d.title, data } } }];"
+      },
+      "name": "Build Autofill Data (Enterprise)1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4080,
+        1328
+      ],
+      "id": "6801d3a8-3bd9-462f-9d80-c979ede5efb1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.canva.com/rest/v1/autofills",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "name": "Canva - Autofill Template (Enterprise)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4336,
+        1360
+      ],
+      "id": "92a1912f-68d4-4a97-b396-40262dbaaec5",
+      "disabled": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Pollinations - 2D Illustration": {
+      "main": [
+        [
+          {
+            "node": "Extract Image1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start - Topic Form1": {
+      "main": [
+        [
+          {
+            "node": "Config1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config1": {
+      "main": [
+        [
+          {
+            "node": "Gemini - Write Script1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini - Write Script1": {
+      "main": [
+        [
+          {
+            "node": "Format Script for Edit1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Script for Edit1": {
+      "main": [
+        [
+          {
+            "node": "Review & Edit Script1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Review & Edit Script1": {
+      "main": [
+        [
+          {
+            "node": "Apply Edits & Split Scenes1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Edits & Split Scenes1": {
+      "main": [
+        [
+          {
+            "node": "Pollinations - 2D Illustration",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gemini - Voice (TTS)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Image1": {
+      "main": [
+        [
+          {
+            "node": "Merge Image + Voice1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini - Voice (TTS)1": {
+      "main": [
+        [
+          {
+            "node": "Make WAV1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make WAV1": {
+      "main": [
+        [
+          {
+            "node": "Merge Image + Voice1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Image + Voice1": {
+      "main": [
+        [
+          {
+            "node": "Prepare Files for Canva1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Files for Canva1": {
+      "main": [
+        [
+          {
+            "node": "Canva - Upload Asset1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Canva - Upload Asset1": {
+      "main": [
+        [
+          {
+            "node": "Wait 3s1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 3s1": {
+      "main": [
+        [
+          {
+            "node": "Canva - Get Upload Job1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Canva - Get Upload Job1": {
+      "main": [
+        [
+          {
+            "node": "Upload Finished?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Finished?1": {
+      "main": [
+        [
+          {
+            "node": "Collect Canva Assets1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 3s1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Canva Assets1": {
+      "main": [
+        [
+          {
+            "node": "Canva - Create Design1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Autofill Data (Enterprise)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Canva - Create Design1": {
+      "main": [
+        [
+          {
+            "node": "Done - Show Canva Link1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Autofill Data (Enterprise)1": {
+      "main": [
+        [
+          {
+            "node": "Canva - Autofill Template (Enterprise)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "07877ae0-75a6-4811-87cf-48aa0942c265",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "75b55027d251dcf092e6c2f371c04323f081c4e4172660c6957f1cda1c0b0d84"
+  },
+  "nodeGroups": [],
+  "id": "i4kDu1QqdklaURCl",
+  "tags": []
+}

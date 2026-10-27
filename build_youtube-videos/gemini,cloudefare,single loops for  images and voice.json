@@ -1,0 +1,932 @@
+{
+  "name": "gemini,cloudefare,single loops for  images and voice",
+  "nodes": [
+    {
+      "parameters": {
+        "command": "=\"{{ $('Config1').first().json.ffmpeg_path }}\" -y -loop 1 -i \"{{ $('Make Audio File1').item.json.image_path }}\" -i \"{{ $('Make Audio File1').item.json.mp3_path }}\" -vf \"scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920\" -c:v libx264 -tune stillimage -pix_fmt yuv420p -r 30 -c:a aac -b:a 192k -shortest \"{{ $('Make Audio File1').item.json.clip_path }}\""
+      },
+      "name": "FFmpeg - Merge Image + Audio",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        4912,
+        1328
+      ],
+      "id": "bea9d53e-ff8b-44a7-9afc-9366f7da3be6"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "name": "Loop Images",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        3152,
+        1088
+      ],
+      "id": "d4bf592b-4869-422b-a8cf-d20fee509f90"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const s = $('Make Audio File1').item.json;\nconst m = $('FFmpeg - Merge Image + Audio').item.json;\nconst reasons = [];\nif (!s.image_bytes || s.image_bytes < 5000) reasons.push('image missing or too small');\nif (!s.audio_bytes || s.audio_bytes < 5000) reasons.push('voice missing or too short');\nif (m.exitCode !== undefined && m.exitCode !== 0) reasons.push('ffmpeg merge failed: ' + String(m.stderr || '').slice(-200));\nreturn { json: { scene: s.scene, clip_path: s.clip_path, ok: reasons.length === 0, reasons } };"
+      },
+      "name": "Judge Clip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5136,
+        1328
+      ],
+      "id": "0e1b51b5-0b92-492d-b9d4-9ed9bd3de513"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "j1",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Clip OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5360,
+        1328
+      ],
+      "id": "f097d06b-aea4-418a-b941-341655969e46"
+    },
+    {
+      "parameters": {
+        "errorMessage": "={{ 'Scene ' + $json.scene + ' clip failed: ' + $json.reasons.join(', ') }}"
+      },
+      "name": "Stop - Clip Failed",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        5584,
+        1456
+      ],
+      "id": "9ab672c3-91f6-41ee-a10b-22cbec7949a2"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "name": "Loop Voices",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        3376,
+        1328
+      ],
+      "id": "7a60eb1f-c408-4d51-b32c-4629c03c1453"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const s = $('Extract Image1').item.json;\nconst reasons = [];\nif (!s.image_bytes || s.image_bytes < 5000) reasons.push('image missing or too small');\nreturn { json: { ...s, ok: reasons.length === 0, reasons } };"
+      },
+      "name": "Judge Image",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4480,
+        960
+      ],
+      "id": "15e7c1af-da3e-4d64-805c-c4af36ab0166"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "i1",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Image OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4704,
+        960
+      ],
+      "id": "22d0d00d-a952-4ba5-84da-d48df0d2493a"
+    },
+    {
+      "parameters": {
+        "errorMessage": "={{ 'Scene ' + $json.scene + ' image failed: ' + $json.reasons.join(', ') }}"
+      },
+      "name": "Stop - Image Failed",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        4912,
+        1104
+      ],
+      "id": "114499b7-1e39-404a-a67f-4b116bf2b2c6"
+    },
+    {
+      "parameters": {
+        "content": "## AI Video v4 (two loops)\n**Topic form → Gemini writes ALL scenes**\n\n**Loop 1 (images):** per scene: edit image prompt → Cloudflare image → save → check\n**Loop 2 (voices):** per scene: edit voice script → Cloudflare voice (WAV) → save → FFmpeg to MP3 → FFmpeg merge image + MP3 → clip → check\n**End:** all clips joined into one video.\n\n**Before starting n8n (same window):**\n`set NODES_EXCLUDE=[]`\n`set N8N_RESTRICT_FILE_ACCESS_TO=C:/temp`\n`npx n8n`\n\nFill keys, `base_dir` and `ffmpeg_path` in **Config**. In edit forms, leave a box empty to keep the text.",
+        "height": 380,
+        "width": 620
+      },
+      "name": "Setup Notes1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2272,
+        544
+      ],
+      "id": "3f0d7733-a418-48f3-9f29-541f09ed1671"
+    },
+    {
+      "parameters": {
+        "formTitle": "AI Video Generator",
+        "formDescription": "Enter a topic and pick a style. I write all scenes, then you edit them one by one.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Topic",
+              "placeholder": "e.g. 5 facts about the pyramids",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Number of scenes",
+              "fieldType": "number",
+              "placeholder": "5"
+            },
+            {
+              "fieldLabel": "Animation style",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "2D Flat Cartoon"
+                  },
+                  {
+                    "option": "Anime"
+                  },
+                  {
+                    "option": "3D Pixar Style"
+                  },
+                  {
+                    "option": "Watercolor Storybook"
+                  },
+                  {
+                    "option": "Comic Book"
+                  },
+                  {
+                    "option": "Paper Cut-out"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Start - Topic Form1",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.3,
+      "position": [
+        2272,
+        1088
+      ],
+      "id": "c4379cf0-1373-4927-b759-63041f234405",
+      "webhookId": "b8df4349-af7f-4b51-ab8f-af7da575f9af"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "topic",
+              "value": "={{ $json.Topic }}",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "scene_count",
+              "value": "={{ $json['Number of scenes'] || 5 }}",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "style",
+              "value": "={{ ({ '2D Flat Cartoon': 'Flat 2D vector cartoon animation style, bold clean outlines, vibrant colors, simple shapes, vertical 9:16 composition, no text or letters in the image.', 'Anime': 'Anime style animation frame, cel shading, expressive characters, vivid colors, detailed painted background, cinematic lighting, vertical 9:16 composition, no text or letters in the image.', '3D Pixar Style': '3D animated movie style, soft studio lighting, rounded friendly characters, rich colors, shallow depth of field, vertical 9:16 composition, no text or letters in the image.', 'Watercolor Storybook': 'Hand-painted watercolor storybook illustration, soft textures, warm pastel palette, gentle brush strokes, vertical 9:16 composition, no text or letters in the image.', 'Comic Book': 'Comic book illustration, bold ink lines, halftone shading, dynamic composition, vivid colors, vertical 9:16 composition, no text or letters in the image.', 'Paper Cut-out': 'Layered paper cut-out animation style, handmade craft look, soft shadows between layers, bright colors, vertical 9:16 composition, no text or letters in the image.' })[$json['Animation style']] || 'Flat 2D vector cartoon animation style, bold clean outlines, vibrant colors, no text or letters in the image.' }}",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "tone",
+              "value": "energetic, friendly, conversational",
+              "type": "string"
+            },
+            {
+              "id": "a5",
+              "name": "base_dir",
+              "value": "C:\\tmp\\video_1",
+              "type": "string"
+            },
+            {
+              "id": "a6",
+              "name": "ffmpeg_path",
+              "value": "C:/bin/ffmpeg.exe",
+              "type": "string"
+            },
+            {
+              "id": "a7",
+              "name": "gemini_api_key",
+              "value": "put_gemini_api_key",
+              "type": "string"
+            },
+            {
+              "id": "a8",
+              "name": "cf_account_id",
+              "value": "put_cf_account_id",
+              "type": "string"
+            },
+            {
+              "id": "a9",
+              "name": "cf_api_token",
+              "value": "put_cf_api_token",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Config1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2496,
+        1088
+      ],
+      "id": "229c1175-277a-4fa8-8993-16d2a72ea6e9"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-goog-api-key",
+              "value": "={{ $('Config1').first().json.gemini_api_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  contents: [{ parts: [{ text: [\n    'You are a short-form video scriptwriter. Write an English narration script about: ' + $json.topic + '.',\n    'Tone: ' + $json.tone + '. Use exactly ' + $json.scene_count + ' scenes, about 40 seconds in total.',\n    'Rules:',\n    '- Scene 1 is the hook: a surprising fact, bold claim or question in under 12 words. Never start with \"Today\" or \"In this video\".',\n    '- Each scene is 1-2 short sentences, 12-22 words, written to be spoken aloud in plain conversational words.',\n    '- One idea per scene, and each scene makes the viewer curious about the next one.',\n    '- The last scene gives a memorable takeaway and a short call to action.',\n    '- No filler, no jargon, and no facts you are not sure about.',\n    '- on_screen_text: max 5 punchy words.',\n    '- image_prompt: one clear visual with subject, action, setting and mood, matching character_description. Do not mention an art style and do not put text in the image.',\n    'Return JSON only in this shape: {\"title\": \"catchy title\", \"character_description\": \"one sentence describing the main character or visual motif for consistent images\", \"scenes\": [{\"script\": \"narration\", \"image_prompt\": \"visual description\", \"on_screen_text\": \"short caption\"}]}'\n  ].join('\\n') }] }],\n  generationConfig: { responseMimeType: \"application/json\" }\n}) }}",
+        "options": {}
+      },
+      "name": "Gemini - Write Scenes1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2720,
+        1088
+      ],
+      "id": "b676b636-9630-49b4-9704-655d520886ae",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.candidates[0].content.parts[0].text;\nconst data = JSON.parse(raw.replace(/```json|```/g, '').trim());\nreturn data.scenes.map((s, i) => ({ json: {\n  scene: i + 1,\n  total: data.scenes.length,\n  title: data.title,\n  character: data.character_description || '',\n  script: s.script,\n  image_prompt: s.image_prompt,\n  on_screen_text: s.on_screen_text\n} }));"
+      },
+      "name": "Split Scenes1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2944,
+        1088
+      ],
+      "id": "15e98d95-a1f3-4d47-953b-88cda451ba13"
+    },
+    {
+      "parameters": {
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Image prompt (leave empty to keep)",
+              "fieldType": "textarea",
+              "placeholder": "={{ $json.image_prompt }}"
+            }
+          ]
+        },
+        "options": {
+          "formTitle": "={{ 'Scene ' + $json.scene + ' of ' + $json.total + ' - image prompt' }}",
+          "formDescription": "={{ '<p><b>Narration:</b> ' + $json.script + '</p><p><b>Current image prompt:</b> ' + $json.image_prompt + '</p><p>Edit the image prompt below, or leave it empty to keep it.</p>' }}",
+          "buttonLabel": "Generate image"
+        }
+      },
+      "name": "Edit Image Prompt1",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.3,
+      "position": [
+        3376,
+        960
+      ],
+      "id": "0166e3b9-ae0a-441b-b74f-d4298fb15381",
+      "webhookId": "9a3ac5f7-6d83-468e-adce-feb41efeb2dc"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const scene = $('Loop Images').item.json;\nconst cfg = $('Config1').first().json;\nconst edited = String($json['Image prompt (leave empty to keep)'] || '').trim();\nconst base = edited || scene.image_prompt;\nconst n = String(scene.scene).padStart(2, '0');\nreturn { json: {\n  ...scene,\n  image_prompt_final: base + '. Main character: ' + scene.character + '. Style: ' + cfg.style,\n  image_path: cfg.base_dir + '/' + $execution.id + '_scene_' + n + '_image.jpg'\n} };"
+      },
+      "name": "Apply Image Prompt1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3600,
+        960
+      ],
+      "id": "90760a6f-2bd0-4a65-8d70-9bbaa31ddb99"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.cloudflare.com/client/v4/accounts/{{ $('Config1').first().json.cf_account_id }}/ai/run/@cf/black-forest-labs/flux-1-schnell",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Config1').first().json.cf_api_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    prompt: String($json.image_prompt || $json.scene || \"cyberpunk cat\"),\n\n  }\n}}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "name": "Cloudflare - Animation Image1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3824,
+        960
+      ],
+      "id": "5105b4ff-0ad6-4452-8f2d-f817bd711977",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const scene = $('Apply Image Prompt1').item.json;\nconst b64 = $json.result && $json.result.image;\nif (!b64) throw new Error('No image returned for scene ' + scene.scene + ': ' + JSON.stringify($json.errors || $json));\nconst buf = Buffer.from(b64, 'base64');\nconst bin = await this.helpers.prepareBinaryData(buf, 'scene_' + scene.scene + '.jpg', 'image/jpeg');\nreturn { json: { ...scene, image_bytes: buf.length }, binary: { image: bin } };"
+      },
+      "name": "Extract Image1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4032,
+        960
+      ],
+      "id": "4baf74e2-85d7-4964-a6cd-8c9f12bb98a2"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.image_path }}",
+        "dataPropertyName": "image",
+        "options": {}
+      },
+      "name": "Write Image File1",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        4256,
+        960
+      ],
+      "id": "1847f8ad-4342-499e-8c73-c9c8832f795d"
+    },
+    {
+      "parameters": {
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Narration (leave empty to keep)",
+              "fieldType": "textarea",
+              "placeholder": "={{ $json.script }}"
+            }
+          ]
+        },
+        "options": {
+          "formTitle": "={{ 'Scene ' + $json.scene + ' of ' + $json.total + ' - voice script' }}",
+          "formDescription": "={{ '<p><b>Current narration:</b> ' + $json.script + '</p><p>Edit the narration below, or leave it empty to keep it.</p>' }}",
+          "buttonLabel": "Generate voice"
+        }
+      },
+      "name": "Edit Voice Script1",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.3,
+      "position": [
+        3600,
+        1328
+      ],
+      "id": "e1c4dcae-10bf-45a6-983b-822804548a11",
+      "webhookId": "2806c9ec-4fc4-4daf-9217-d4f3da084b28"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const scene = $('Loop Voices').item.json;\nconst edited = String($json['Narration (leave empty to keep)'] || '').trim();\nreturn { json: { ...scene, script_final: edited || scene.script } };"
+      },
+      "name": "Apply Script1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3824,
+        1328
+      ],
+      "id": "58b35a32-b5f2-4903-a729-25ef4e71040f"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.cloudflare.com/client/v4/accounts/{{ $('Config1').first().json.cf_account_id }}/ai/run/@cf/myshell-ai/melotts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Config1').first().json.cf_api_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ prompt: $json.script_final, lang: 'en' }) }}",
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "name": "Cloudflare - Voice (MeloTTS)1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4032,
+        1328
+      ],
+      "id": "9510253e-34d0-4994-b611-5b0bedbda6df",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const scene = $('Apply Script1').item.json;\nconst cfg = $('Config1').first().json;\nlet buf;\nconst keys = Object.keys($binary || {});\nif (keys.length) {\n  buf = await this.helpers.getBinaryDataBuffer($itemIndex, keys[0]);\n  if (buf.slice(0, 1).toString('latin1') === '{') {\n    const j = JSON.parse(buf.toString('utf8'));\n    const b64 = (j.result && j.result.audio) || j.audio;\n    if (!b64) throw new Error('JSON without audio: ' + buf.toString('utf8').slice(0, 300));\n    buf = Buffer.from(b64, 'base64');\n  }\n} else {\n  const b64 = ($json.result && $json.result.audio) || $json.audio;\n  if (!b64) throw new Error('No audio in JSON or binary. Input: ' + JSON.stringify($json));\n  buf = Buffer.from(b64, 'base64');\n}\nconst ext = buf.slice(0, 4).toString('latin1') === 'RIFF' ? 'wav' : 'mp3';\nconst n = String(scene.scene).padStart(2, '0');\nconst run = $execution.id;\nconst srcName = run + '_scene_' + n + '_audio_src.' + ext;\nconst bin = await this.helpers.prepareBinaryData(buf, srcName, ext === 'wav' ? 'audio/wav' : 'audio/mpeg');\nreturn { json: {\n  ...scene,\n  audio_bytes: buf.length,\n  src_path: cfg.base_dir + '/' + srcName,\n  mp3_path: cfg.base_dir + '/' + run + '_scene_' + n + '_audio.mp3',\n  clip_path: cfg.base_dir + '/' + run + '_scene_' + n + '_clip.mp4'\n}, binary: { audio: bin } };"
+      },
+      "name": "Make Audio File1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4256,
+        1328
+      ],
+      "id": "9eb7a927-66ed-4279-905f-79e988db93b7"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.src_path }}",
+        "dataPropertyName": "audio",
+        "options": {}
+      },
+      "name": "Write Audio File1",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        4480,
+        1328
+      ],
+      "id": "5ad1db1d-d750-4934-a318-b65d248b8d82"
+    },
+    {
+      "parameters": {
+        "command": "=\"{{ $('Config1').first().json.ffmpeg_path }}\" -y -i \"{{ $('Make Audio File1').item.json.src_path }}\" -codec:a libmp3lame -b:a 128k \"{{ $('Make Audio File1').item.json.mp3_path }}\""
+      },
+      "name": "FFmpeg - To MP",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        4704,
+        1328
+      ],
+      "id": "0e964272-0ee2-45b0-bc23-5a761d78fd34"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json).sort((a, b) => a.scene - b.scene);\nconst cfg = $('Config1').first().json;\nconst ff = '\"' + cfg.ffmpeg_path + '\"';\nconst out = cfg.base_dir + '/' + $execution.id + '_final.mp4';\nlet cmd;\nif (items.length === 1) {\n  cmd = ff + ' -y -i \"' + items[0].clip_path + '\" -c copy \"' + out + '\"';\n} else {\n  const inputs = items.map(s => '-i \"' + s.clip_path + '\"').join(' ');\n  const maps = items.map((s, i) => '[' + i + ':v][' + i + ':a]').join('');\n  cmd = ff + ' -y ' + inputs + ' -filter_complex \"' + maps + 'concat=n=' + items.length + ':v=1:a=1[v][a]\" -map \"[v]\" -map \"[a]\" -c:v libx264 -pix_fmt yuv420p -c:a aac \"' + out + '\"';\n}\nreturn [{ json: { join_command: cmd, final_path: out, count: items.length } }];"
+      },
+      "name": "Build Join Command1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3376,
+        1680
+      ],
+      "id": "024ea348-ac8e-444b-9c75-d66c0cc2adb3"
+    },
+    {
+      "parameters": {
+        "command": "={{ $json.join_command }}"
+      },
+      "name": "FFmpeg - Join All Clips1",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        3600,
+        1680
+      ],
+      "id": "5d8ba7b8-7fa5-46ca-98c5-5635b4089d11"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "completionTitle": "Your video is ready",
+        "completionMessage": "={{ 'Final video saved to: ' + $('Build Join Command1').first().json.final_path + ' (' + $('Build Join Command1').first().json.count + ' scenes). Each scene clip, MP3 and image is also in ' + $('Config1').first().json.base_dir }}",
+        "options": {}
+      },
+      "name": "Done - Final Video Saved1",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.3,
+      "position": [
+        3824,
+        1680
+      ],
+      "id": "172aac17-c295-42e8-a120-f29909f5f9fc",
+      "webhookId": "65a8f71e-7483-4988-8a00-e72c94412547"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Loop Images": {
+      "main": [
+        [
+          {
+            "node": "Loop Voices",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Image Prompt1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Judge Image": {
+      "main": [
+        [
+          {
+            "node": "Image OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image OK?": {
+      "main": [
+        [
+          {
+            "node": "Loop Images",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop - Image Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Voices": {
+      "main": [
+        [
+          {
+            "node": "Build Join Command1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Voice Script1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FFmpeg - Merge Image + Audio": {
+      "main": [
+        [
+          {
+            "node": "Judge Clip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Judge Clip": {
+      "main": [
+        [
+          {
+            "node": "Clip OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clip OK?": {
+      "main": [
+        [
+          {
+            "node": "Loop Voices",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop - Clip Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start - Topic Form1": {
+      "main": [
+        [
+          {
+            "node": "Config1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config1": {
+      "main": [
+        [
+          {
+            "node": "Gemini - Write Scenes1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini - Write Scenes1": {
+      "main": [
+        [
+          {
+            "node": "Split Scenes1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Scenes1": {
+      "main": [
+        [
+          {
+            "node": "Loop Images",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Image Prompt1": {
+      "main": [
+        [
+          {
+            "node": "Apply Image Prompt1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Image Prompt1": {
+      "main": [
+        [
+          {
+            "node": "Cloudflare - Animation Image1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloudflare - Animation Image1": {
+      "main": [
+        [
+          {
+            "node": "Extract Image1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Image1": {
+      "main": [
+        [
+          {
+            "node": "Write Image File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Image File1": {
+      "main": [
+        [
+          {
+            "node": "Judge Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Voice Script1": {
+      "main": [
+        [
+          {
+            "node": "Apply Script1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Script1": {
+      "main": [
+        [
+          {
+            "node": "Cloudflare - Voice (MeloTTS)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloudflare - Voice (MeloTTS)1": {
+      "main": [
+        [
+          {
+            "node": "Make Audio File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make Audio File1": {
+      "main": [
+        [
+          {
+            "node": "Write Audio File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Audio File1": {
+      "main": [
+        [
+          {
+            "node": "FFmpeg - To MP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FFmpeg - To MP": {
+      "main": [
+        [
+          {
+            "node": "FFmpeg - Merge Image + Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Join Command1": {
+      "main": [
+        [
+          {
+            "node": "FFmpeg - Join All Clips1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FFmpeg - Join All Clips1": {
+      "main": [
+        [
+          {
+            "node": "Done - Final Video Saved1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "c662f0f3-f0d7-4557-879e-da1360777617",
+  "meta": {
+    "instanceId": "75b55027d251dcf092e6c2f371c04323f081c4e4172660c6957f1cda1c0b0d84"
+  },
+  "nodeGroups": [],
+  "id": "VLh2e5BxGRvmrcqg",
+  "tags": []
+}

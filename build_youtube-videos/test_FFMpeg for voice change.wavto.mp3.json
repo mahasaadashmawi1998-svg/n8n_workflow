@@ -1,0 +1,276 @@
+{
+  "name": "test_FFMpeg for voice{   \"nodes\": [     {       \"parameters\": {},       \"name\": \"Manual Trigger\",       \"type\": \"n8n-nodes-base.",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -496,
+        16
+      ],
+      "id": "990067e0-dae8-4e0c-8551-1be5e0c4622f"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "text",
+              "value": "Did you know the pyramids were once covered in shiny white stone?",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "base_dir",
+              "value": "C:\\tmp",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "ffmpeg_path",
+              "value": "put_path",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "cf_account_id",
+              "value": "cf_account_id",
+              "type": "string"
+            },
+            {
+              "id": "a5",
+              "name": "cf_account_id",
+              "value": "cf_account_id",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Test Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -272,
+        16
+      ],
+      "id": "240875d1-ed56-4882-9028-11618ad314c1"
+    },
+    {
+      "parameters": {
+        "fileSelector": "={{ $('Make Audio File2').item.json.mp3_path }}",
+        "options": {
+          "dataPropertyName": "data"
+        }
+      },
+      "name": "Read MP3 Back",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        832,
+        16
+      ],
+      "id": "43bc6986-c3da-49ce-9d52-59b6fb87164e"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const m = $('Make Audio File2').item.json;\nconst buf = await this.helpers.getBinaryDataBuffer($itemIndex, 'data');\nconst isMp3 = buf.slice(0, 3).toString('latin1') === 'ID3' || (buf[0] === 0xFF && (buf[1] & 0xE0) === 0xE0);\nreturn { json: {\n  is_mp3: isMp3,\n  source_format: m.source_format,\n  source_bytes: m.source_bytes,\n  mp3_bytes: buf.length,\n  mp3_path: m.mp3_path,\n  message: isMp3 ? 'FFmpeg worked. Play the MP3 file at mp3_path.' : 'The output file is not an MP3. Check the FFmpeg node output.'\n} };"
+      },
+      "name": "Check Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        16
+      ],
+      "id": "6e984919-9f52-41e6-9010-ea0f9873d1c1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.cloudflare.com/client/v4/accounts/{{ $('Test Config').first().json.cf_account_id }}/ai/run/@cf/myshell-ai/melotts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Test Config').first().json.cf_api_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ prompt: $('Test Config').first().json.text, lang: 'en' }) }}",
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "name": "Cloudflare - Voice (MeloTTS)2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -48,
+        16
+      ],
+      "id": "615aaf66-1026-48f5-9c23-d446e956e874"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const cfg = $('Test Config').first().json;\nlet buf;\nconst keys = Object.keys($binary || {});\nif (keys.length) {\n  buf = await this.helpers.getBinaryDataBuffer($itemIndex, keys[0]);\n  if (buf.slice(0, 1).toString('latin1') === '{') {\n    const j = JSON.parse(buf.toString('utf8'));\n    const b64 = (j.result && j.result.audio) || j.audio;\n    if (!b64) throw new Error('JSON without audio: ' + buf.toString('utf8').slice(0, 300));\n    buf = Buffer.from(b64, 'base64');\n  }\n} else {\n  const b64 = ($json.result && $json.result.audio) || $json.audio;\n  if (!b64) throw new Error('No audio in JSON or binary. Input: ' + JSON.stringify($json));\n  buf = Buffer.from(b64, 'base64');\n}\nconst ext = buf.slice(0, 4).toString('latin1') === 'RIFF' ? 'wav' : 'mp3';\nconst run = $execution.id;\nconst srcName = 'test_' + run + '_audio_src.' + ext;\nconst bin = await this.helpers.prepareBinaryData(buf, srcName, ext === 'wav' ? 'audio/wav' : 'audio/mpeg');\nreturn { json: {\n  source_format: ext,\n  source_bytes: buf.length,\n  src_path: cfg.base_dir + '/' + srcName,\n  mp3_path: cfg.base_dir + '/test_' + run + '_audio.mp3'\n}, binary: { audio: bin } };"
+      },
+      "name": "Make Audio File2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        16
+      ],
+      "id": "61a64b19-830f-40d5-9cb2-ce86e967a180"
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.src_path }}",
+        "dataPropertyName": "audio",
+        "options": {}
+      },
+      "name": "Write Audio File2",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        384,
+        16
+      ],
+      "id": "d2bbcdef-2b8a-4f13-936c-eb10c2ad32ae"
+    },
+    {
+      "parameters": {
+        "command": "=\"C:/bin/ffmpeg.exe\" -y -i \"{{ $('Make Audio File2').item.json.src_path }}\" -codec:a libmp3lame -b:a 128k \"{{ $('Make Audio File2').item.json.mp3_path }}\""
+      },
+      "name": "FFmpeg - To MP4",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        608,
+        16
+      ],
+      "id": "66c413b2-e545-4d74-8d08-eda6b6803b20"
+    },
+    {
+      "parameters": {
+        "content": "## Audio + FFmpeg test (no loops)\nCloudflare voice → save WAV → FFmpeg to MP3 → read MP3 back → check.\n\n1. Fill **Test Config**\n2. Start n8n from a terminal with:\n`set NODES_EXCLUDE=[]`\n`set N8N_RESTRICT_FILE_ACCESS_TO=C:/Temp`\n`npx n8n`\n3. Click **Execute workflow**\n4. The last node shows `is_mp3: true` when it worked",
+        "height": 300,
+        "width": 520
+      },
+      "name": "Setup Notes2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        -336
+      ],
+      "id": "0c86a8f2-2007-4b85-8f42-191d2f105fe9"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Test Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Config": {
+      "main": [
+        [
+          {
+            "node": "Cloudflare - Voice (MeloTTS)2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read MP3 Back": {
+      "main": [
+        [
+          {
+            "node": "Check Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cloudflare - Voice (MeloTTS)2": {
+      "main": [
+        [
+          {
+            "node": "Make Audio File2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make Audio File2": {
+      "main": [
+        [
+          {
+            "node": "Write Audio File2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Audio File2": {
+      "main": [
+        [
+          {
+            "node": "FFmpeg - To MP4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FFmpeg - To MP4": {
+      "main": [
+        [
+          {
+            "node": "Read MP3 Back",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a5c81021-1794-4d79-9c26-14a1c8ff73dd",
+  "meta": {
+    "instanceId": "75b55027d251dcf092e6c2f371c04323f081c4e4172660c6957f1cda1c0b0d84"
+  },
+  "nodeGroups": [],
+  "id": "xz9nyufVefTt3AQj",
+  "tags": []
+}
