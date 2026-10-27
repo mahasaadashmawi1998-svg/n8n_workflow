@@ -1,0 +1,540 @@
+{
+  "name": "final_work_flow",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        64
+      ],
+      "id": "9a8fb03f-233b-4ca9-a31e-a256f0a0ba6b",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -400,
+        -128
+      ],
+      "id": "e6f1c732-8a13-4b29-b700-c6a2de7bf5b1",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1grkMcwE9A4wWXAtybBg4np1fo21RGEYfKsj2CbISs-Q",
+          "mode": "list",
+          "cachedResultName": "topics",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1grkMcwE9A4wWXAtybBg4np1fo21RGEYfKsj2CbISs-Q/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1grkMcwE9A4wWXAtybBg4np1fo21RGEYfKsj2CbISs-Q/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -176,
+        -32
+      ],
+      "id": "e50e2768-7a37-42ae-af16-a73a68040472",
+      "name": "google_sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "k6q37iAGYMatxBkO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "blogId",
+              "value": "YOUR_blog_id",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "ollamaUrl",
+              "value": "ollama URL",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "model",
+              "value": "ollama_model",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "blogUrl",
+              "value": "put_blogURL",
+              "type": "string"
+            },
+            {
+              "id": "70e29a83-5310-4f56-b081-f6b333817e8e",
+              "name": "prompt",
+              "value": "={{ $json.prompt }}",
+              "type": "string"
+            },
+            {
+              "id": "286a2048-0c72-4448-876e-9bf7ec61e1c6",
+              "name": "Topic",
+              "value": "={{ $json.topic }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c330c946-ad03-4460-8a0c-5691fecb8052",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        48,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.ollamaUrl }}/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  JSON.stringify({\n    model: $json.model,\n    prompt: $json.prompt,\n    stream: false,\n    format: \"json\"\n  })\n}}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "efb9ef0d-a80a-4450-aeb6-a7aefa11634b",
+      "name": "Ollama: Outline",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        -32
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "\n\nconst item = $input.first().json;\n\nreturn [{\n  json: {\n    model: item.model,\n    prompt: item.prompt,\n    stream: false,\n    format: \"json\"\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        -32
+      ],
+      "id": "afc1a248-2f3a-4c3f-af90-044fc9ed4398",
+      "name": "java request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.response;\n\nif (!raw) {\n  throw new Error('Ollama response is empty');\n}\n\nlet article;\n\ntry {\n  article = JSON.parse(raw);\n} catch (error) {\n  throw new Error('Invalid article JSON: ' + error.message);\n}\n\nreturn {\n  json: {\n    ...article,\n    topic: $('Config').first().json.Topic,\n    blogId: $('Config').first().json.blogId\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        784,
+        -32
+      ],
+      "id": "5947807d-6dda-45bf-84c5-0adb2068f572",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Remembers the title (avoids repeats) and prints a handy edit link.\nconst sd = $getWorkflowStaticData('global');\nconst cfg = $('Config').first().json;\nconst b = $('Build HTML').first().json;\nconst r = $input.first().json;\nsd.titles = [...(sd.titles || []), b.title].slice(-60);\nreturn [{ json: {\n  status: r.status || 'DRAFT',\n  title: r.title || b.title,\n  postId: r.id,\n  editUrl: `https://www.blogger.com/blog/post/edit/${cfg.blogId}/${r.id}`,\n  labels: b.labels\n}}];"
+      },
+      "id": "657ebb61-bec2-474f-96b9-17339ffabf16",
+      "name": "Record Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        -32
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://www.googleapis.com/blogger/v3/blogs/' + $('Config').first().json.blogId + '/posts?isDraft=true' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ kind: 'blogger#post', title: $json.title, content: $json.content, labels: $json.labels }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "9a79cbdc-167a-4e63-805c-db2b604368d6",
+      "name": "Blogger: Create Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1264,
+        -32
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleOAuth2Api": {
+          "id": "ebP3mr4d0ziDMxQN",
+          "name": "Google account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const article = $json;\n\nfunction escapeHtml(value = '') {\n  return String(value).replace(/[&<>\"']/g, char => ({\n    '&': '&amp;',\n    '<': '&lt;',\n    '>': '&gt;',\n    '\"': '&quot;',\n    \"'\": '&#39;'\n  }[char]));\n}\n\nfunction codeBlock(code, language = 'text') {\n  if (!code) return '';\n  return `<pre class=\"code-block\"><code class=\"language-${escapeHtml(language)}\">${escapeHtml(code)}</code></pre>`;\n}\n\nfunction slug(text = '') {\n  return String(text)\n    .toLowerCase()\n    .replace(/[^a-z0-9]+/g, '-')\n    .replace(/^-|-$/g, '');\n}\n\nconst sections = (article.sections || []).map((section, i) => {\n  const id = slug(section.heading || `section-${i + 1}`);\n  return `\n    <section class=\"article-section\" id=\"${id}\">\n      <h2>${escapeHtml(section.heading || `Section ${i + 1}`)}</h2>\n      <p>${escapeHtml(section.content || '').replace(/\\n/g, '<br>')}</p>\n      ${section.code ? codeBlock(section.code, section.code_language || 'verilog') : ''}\n    </section>`;\n}).join('');\n\nconst figures = (article.figures || []).map((figure, i) => `\n  <figure class=\"technical-figure\">\n    <div class=\"figure-placeholder\">\n      <strong>Figure ${i + 1}: ${escapeHtml(figure.title || 'Technical diagram')}</strong>\n      <p>${escapeHtml(figure.description || '')}</p>\n      ${figure.diagram_source\n        ? `<pre><code>${escapeHtml(figure.diagram_source)}</code></pre>`\n        : ''}\n      <p><em>${escapeHtml(figure.caption || '')}</em></p>\n    </div>\n  </figure>\n`).join('');\n\nconst toc = (article.sections || []).map((section, i) =>\n  `<li><a href=\"#${slug(section.heading || `section-${i + 1}`)}\">${escapeHtml(section.heading || `Section ${i + 1}`)}</a></li>`\n).join('');\n\nconst specialCode = [\n  ['Verilog RTL Implementation', article.verilog_rtl],\n  ['Verification Testbench', article.testbench]\n].filter(([, code]) => code);\n\nconst codeSections = specialCode.map(([heading, code]) => `\n  <section class=\"article-section\">\n    <h2>${escapeHtml(heading)}</h2>\n    ${codeBlock(code, 'verilog')}\n  </section>\n`).join('');\n\nconst html = `\n<article class=\"chipworld-article\">\n<style>\n.chipworld-article {\n  font-family: Arial, sans-serif;\n  color: #243247;\n  line-height: 1.8;\n  max-width: 900px;\n  margin: auto;\n}\n.chipworld-article h1 {\n  color: #12345a;\n  line-height: 1.3;\n  font-size: 2em;\n}\n.chipworld-article h2 {\n  color: #176b87;\n  border-bottom: 2px solid #dce8f0;\n  padding-bottom: 8px;\n  margin-top: 32px;\n}\n.chipworld-article .article-intro {\n  background: #f0f6fa;\n  padding: 18px;\n  border-left: 4px solid #176b87;\n  border-radius: 6px;\n}\n.chipworld-article .code-block,\n.chipworld-article .figure-placeholder {\n  background: #f4f6f8;\n  border: 1px solid #d9e1e8;\n  border-radius: 8px;\n  padding: 16px;\n  overflow-x: auto;\n}\n.chipworld-article .code-block {\n  color: #17212f;\n  white-space: pre;\n  font-family: Consolas, monospace;\n  font-size: 14px;\n  line-height: 1.5;\n}\n.chipworld-article a { color: #176b87; }\n.chipworld-article figure { margin: 24px 0; }\n</style>\n\n<header>\n  <h1>${escapeHtml(article.title || article.topic || 'Engineering Article')}</h1>\n</header>\n\n<section class=\"article-intro\">\n  ${escapeHtml(article.introduction || '').replace(/\\n/g, '<br>')}\n</section>\n\n<nav class=\"article-toc\">\n  <h2>Table of Contents</h2>\n  <ol>${toc}</ol>\n</nav>\n\n${sections}\n\n${figures ? `<h2>Figures and Diagrams</h2>${figures}` : ''}\n\n${codeSections}\n\n${article.summary ? `\n<section class=\"article-section\">\n  <h2>Summary</h2>\n  <p>${escapeHtml(article.summary).replace(/\\n/g, '<br>')}</p>\n</section>` : ''}\n\n</article>`;\n\nreturn {\n  json: {\n    title: article.title || article.topic || 'Engineering Article',\n    blogId: article.blogId,\n    html,\n    article\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        -32
+      ],
+      "id": "e11f0bbd-ed11-44d9-9346-268f9a56a321",
+      "name": "Build HTML"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parses the outline JSON (with fallbacks) and emits ONE ITEM PER SECTION, each with its own writing prompt.\nconst cfg = $('Config').first().json;\nconst pick = $('Config').first().json;\n\nfunction parseJson(t) {\n  if (typeof t !== 'string') return null;\n  const s = t.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();\n  const a = s.indexOf('{'), b = s.lastIndexOf('}');\n  if (a < 0 || b <= a) return null;\n  try { return JSON.parse(s.slice(a, b + 1)); } catch (e) { return null; }\n}\n\nconst plan = parseJson($input.first().json.response) || {};\nlet sections = (Array.isArray(plan.sections) ? plan.sections : [])\n  .filter(s => s && typeof s.heading === 'string' && s.heading.trim())\n  .slice(0, 5)\n  .map(s => ({\n    heading: s.heading.trim().slice(0, 80),\n    points: Array.isArray(s.points) ? s.points.map(String) : (s.points ? [String(s.points)] : [])\n  }));\n\nlet usedFallback = false;\nif (sections.length < 3) {\n  usedFallback = true;\n  sections = [\n    { heading: 'The core idea', points: ['What it is', 'Why it matters'] },\n    { heading: 'How it works', points: ['Main steps', 'Key terms'] },\n    { heading: 'A worked example', points: ['A simple example with small numbers or an analogy'] },\n    { heading: 'Uses and common mistakes', points: ['Real-world uses', 'Common misunderstandings'] }\n  ];\n}\n\nconst title = String(plan.title || pick.seed).replace(/[\"\\n]/g, '').slice(0, 90);\nconst meta = {\n  title,\n  description: String(plan.description || pick.seed).slice(0, 160),\n  keywords: Array.isArray(plan.keywords) ? plan.keywords.map(k => String(k).toLowerCase()).slice(0, 5) : [],\n  intro: String(plan.intro || `This post explains: ${pick.seed}.`).slice(0, 600),\n  cat: pick.cat, level: pick.level, seed: pick.seed, usedFallback\n};\n\nconst system = 'You are a STEM educator writing one section of a blog post. Output plain text only.';\nreturn sections.map((s, idx) => ({\n  json: {\n    ...meta, sectionIndex: idx, total: sections.length, heading: s.heading,\n    ollamaRequest: {\n      model: cfg.model, system, stream: false, keep_alive: '5m',\n      prompt: `Blog title: ${title}\nAudience level: ${pick.level}\nWrite the section titled \"${s.heading}\".\nCover these points: ${s.points.join('; ') || pick.seed}\n\nRules:\n-Length and structure: Write approximately 200 words, organized into 2–8 short paragraphs separated by a blank line. Keep the explanation focused and avoid unnecessary repetition.\n\n-Technical definitions: Define every important technical term, acronym, or abbreviation the first time it appears. Use the full term before introducing its acronym in parentheses.\n\n-Practical understanding: Include at least one concrete everyday analogy or a small worked example that makes the concept easier to understand. Ensure the analogy accurately reflects the technical concept, and explain where it differs if necessary.\n\n-Accuracy: Use only facts you can confidently support. Never invent statistics, dates, specifications, citations, experiments, or results. If a detail is uncertain, omit it or describe it cautiously.\n\n-Clarity: Use clear, professional English suitable for engineering students and beginners. Explain complex ideas in simple language without sacrificing technical correctness.\n\n-Relevance: Stay focused on the requested topic. Include only details that help the reader understand the concept or apply it.\n\n-Formatting: Use natural paragraphs, correct grammar, and consistent technical notation. Avoid excessive bullet points, decorative symbols, and unexplained code.\n\n-Examples and code: If code is requested, ensure it is syntactically plausible, relevant, and clearly explained. Never claim code has been tested unless it actually has been tested.\n\n-Uncertainty: Distinguish established facts from assumptions. If reliable information is unavailable, state the limitation rather than guessing.\n\n-Output: Return only the requested article or explanation. Do not include commentary about these rules or describe your writing process.\n- You may use **bold** for key terms and \"- \" bullet lines (max 4 bullets).\n- Do not write headings, titles, emojis, or a closing summary${idx === sections.length - 1 ? '' : ' or any conclusion'}.\nOutput only the section text.`,\n      options: { temperature: 0.6, num_ctx: 4096, num_predict: 450 }\n    }\n  }\n}));"
+      },
+      "id": "c1433977-6d3c-421e-acad-2320938924b7",
+      "name": "Parse Outline",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        64,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.ollamaUrl }}/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.ollamaRequest) }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "bd4260be-bcc8-4a41-bf2e-d4bd8f84aacf",
+      "name": "Ollama: Section",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        272,
+        272
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collects the written sections and builds the wrap-up (takeaways, quiz, figure spec) prompt.\nconst cfg = $('Config').first().json;\nconst meta = $('Parse Outline').all().map(i => i.json);\nconst resp = $input.all().map(i => i.json.response || '');\nconst first = meta[0];\n\nconst sections = meta.map((m, i) => ({\n  heading: m.heading,\n  text: String(resp[i] || '').trim(),\n  missing: String(resp[i] || '').trim().length < 150\n}));\n\nconst headings = sections.map(s => s.heading).join(' | ');\nconst system = 'You are a STEM educator. Reply with valid JSON only.';\nconst prompt = `Blog post title: ${first.title}\nCategory: ${first.cat}\nSection headings: ${headings}\n\nReturn JSON with exactly these keys:\n{\n  \"takeaways\": [\"3 to 4 short sentences summarising the main lessons\"],\n  \"quiz\": [{\"question\": \"...\", \"answer\": \"1 to 2 sentence answer\"}],\n  \"labels\": [\"2 to 3 short topic labels\"],\n  \"figure\": { }\n}\nQuiz: exactly 3 questions that test understanding, not trivia.\nFigure: choose ONE type that best fits the topic and fill it in:\n- \"flow\" for a process or system:\n  {\"type\":\"flow\",\"title\":\"...\",\"caption\":\"...\",\"steps\":[\"3 to 5 labels, max 4 words each\"]}\n- \"function\" for how one quantity changes with another:\n  {\"type\":\"function\",\"title\":\"...\",\"caption\":\"...\",\"shape\":\"linear|quadratic|exponential|logarithmic|sine|sigmoid|inverse\",\"x_label\":\"...\",\"y_label\":\"...\"}\n- \"bar\" for a conceptual comparison:\n  {\"type\":\"bar\",\"title\":\"...\",\"caption\":\"...\",\"y_label\":\"...\",\"labels\":[\"3 to 5 items\"],\"values\":[relative scores from 1 to 10]}\nNever invent real-world statistics. Bar values are relative and illustrative only.`;\n\nreturn [{ json: {\n  ...first, sections,\n  ollamaRequest: {\n    model: cfg.model, system, prompt, stream: false, format: 'json', keep_alive: '5m',\n    options: { temperature: 0.4, num_ctx: 4096, num_predict: 700 }\n  }\n}}];"
+      },
+      "id": "765127d5-07d9-476c-9bbe-88fada201f93",
+      "name": "Assemble",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.ollamaUrl }}/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.ollamaRequest) }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "e12b865a-ce98-4b95-9ab5-32b026f33fec",
+      "name": "Ollama: Wrap-up",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        272
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parses wrap-up JSON, renders the SVG figure, and builds the final Blogger HTML.\nconst d = $('Assemble').first().json;\nconst wrap = $input.first().json.response;\n\nconst esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nfunction parseJson(t) {\n  if (typeof t !== 'string') return null;\n  const s = t.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();\n  const a = s.indexOf('{'), b = s.lastIndexOf('}');\n  if (a < 0 || b <= a) return null;\n  try { return JSON.parse(s.slice(a, b + 1)); } catch (e) { return null; }\n}\nconst W = 640, H = 360;\nconst C = { ink: '#1f2937', muted: '#6b7280', accent: '#2563eb', light: '#dbeafe', bg: '#f8fafc', grid: '#e5e7eb' };\nconst FONT = 'Arial,Helvetica,sans-serif';\n\n// ---------- text -> HTML ----------\nconst inline = s => esc(s)\n  .replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>')\n  .replace(/`([^`]+)`/g, '<code style=\"background:#f1f5f9;color:#0f172a;padding:1px 5px;border-radius:4px;font-size:0.92em\">$1</code>');\n\nfunction toHtml(text, heading) {\n  const cleaned = String(text || '').replace(/\\r/g, '').replace(/```[a-z]*/gi, '').replace(/^#+\\s.*$/gm, '')\n    .split('\\n').filter(l => l.trim().toLowerCase() !== String(heading).trim().toLowerCase()).join('\\n').trim();\n  if (!cleaned) return '<p style=\"margin:0 0 16px\"><em>[TODO: this section was not generated - write it manually.]</em></p>';\n  return cleaned.split(/\\n\\s*\\n/).map(b => {\n    const lines = b.split('\\n').map(l => l.trim()).filter(Boolean);\n    if (lines.length && lines.every(l => /^[-*\\u2022]\\s+/.test(l))) {\n      return '<ul style=\"margin:0 0 16px;padding-left:24px\">' +\n        lines.map(l => '<li style=\"margin:4px 0\">' + inline(l.replace(/^[-*\\u2022]\\s+/, '')) + '</li>').join('') + '</ul>';\n    }\n    return '<p style=\"margin:0 0 16px\">' + inline(lines.join(' ')) + '</p>';\n  }).join('\\n');\n}\n\n// ---------- SVG figures ----------\nfunction wrapText(t, max) {\n  const words = String(t).split(/\\s+/); const lines = []; let cur = '';\n  for (const w of words) {\n    if ((cur + ' ' + w).trim().length > max && cur) { lines.push(cur); cur = w; } else { cur = (cur + ' ' + w).trim(); }\n  }\n  if (cur) lines.push(cur);\n  return lines.slice(0, 3);\n}\nconst svgOpen = title =>\n  `<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 ${W} ${H}\" role=\"img\" aria-label=\"${esc(title)}\" style=\"width:100%;height:auto;max-width:640px;display:block;margin:0 auto;background:${C.bg};border:1px solid #e2e8f0;border-radius:8px\">` +\n  `<text x=\"${W / 2}\" y=\"28\" text-anchor=\"middle\" font-family=\"${FONT}\" font-size=\"18\" font-weight=\"bold\" fill=\"${C.ink}\">${esc(title)}</text>`;\n\nfunction flowSvg(f) {\n  const steps = f.steps.slice(0, 5).map(s => String(s).slice(0, 40)); const n = steps.length;\n  const gap = 36, bh = 90, bw = (W - 40 - gap * (n - 1)) / n, y = H / 2 - bh / 2 + 10;\n  const maxc = Math.max(8, Math.floor(bw / 7.5));\n  let s = svgOpen(f.title) +\n    `<defs><marker id=\"arr\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto\"><path d=\"M0,0 L10,5 L0,10 z\" fill=\"${C.muted}\"/></marker></defs>`;\n  steps.forEach((t, i) => {\n    const x = 20 + i * (bw + gap);\n    s += `<rect x=\"${x.toFixed(1)}\" y=\"${y}\" width=\"${bw.toFixed(1)}\" height=\"${bh}\" rx=\"10\" fill=\"${C.light}\" stroke=\"${C.accent}\" stroke-width=\"2\"/>`;\n    s += `<text x=\"${(x + 10).toFixed(1)}\" y=\"${y + 18}\" font-family=\"${FONT}\" font-size=\"12\" font-weight=\"bold\" fill=\"${C.accent}\">${i + 1}</text>`;\n    const lines = wrapText(t, maxc);\n    lines.forEach((ln, j) => {\n      s += `<text x=\"${(x + bw / 2).toFixed(1)}\" y=\"${(y + bh / 2 + (j - (lines.length - 1) / 2) * 18 + 5).toFixed(1)}\" text-anchor=\"middle\" font-family=\"${FONT}\" font-size=\"14\" fill=\"${C.ink}\">${esc(ln)}</text>`;\n    });\n    if (i < n - 1) s += `<line x1=\"${(x + bw + 4).toFixed(1)}\" y1=\"${y + bh / 2}\" x2=\"${(x + bw + gap - 4).toFixed(1)}\" y2=\"${y + bh / 2}\" stroke=\"${C.muted}\" stroke-width=\"2\" marker-end=\"url(#arr)\"/>`;\n  });\n  return s + '</svg>';\n}\n\nfunction fnSvg(f) {\n  const L = 70, R = 30, T = 50, B = 60, pw = W - L - R, ph = H - T - B;\n  const fns = {\n    linear: x => x, quadratic: x => x * x, exponential: x => Math.pow(2, x / 2),\n    logarithmic: x => Math.log(1 + x), sine: x => Math.sin(x * 0.628),\n    sigmoid: x => 1 / (1 + Math.exp(-(x - 5))), inverse: x => 1 / (1 + x)\n  };\n  const fn = fns[f.shape] || fns.linear;\n  const pts = []; for (let i = 0; i <= 60; i++) { const x = i / 6; pts.push([x, fn(x)]); }\n  const ys = pts.map(p => p[1]); const mn = Math.min(...ys), mx = Math.max(...ys);\n  const path = pts.map((p, i) => {\n    const px = L + (p[0] / 10) * pw, py = T + ph - ((p[1] - mn) / ((mx - mn) || 1)) * ph;\n    return (i ? 'L' : 'M') + px.toFixed(1) + ',' + py.toFixed(1);\n  }).join(' ');\n  let s = svgOpen(f.title);\n  for (let g = 1; g <= 4; g++) s += `<line x1=\"${L}\" y1=\"${T + ph * g / 5}\" x2=\"${L + pw}\" y2=\"${T + ph * g / 5}\" stroke=\"${C.grid}\"/>`;\n  s += `<line x1=\"${L}\" y1=\"${T}\" x2=\"${L}\" y2=\"${T + ph}\" stroke=\"${C.ink}\" stroke-width=\"2\"/>`;\n  s += `<line x1=\"${L}\" y1=\"${T + ph}\" x2=\"${L + pw}\" y2=\"${T + ph}\" stroke=\"${C.ink}\" stroke-width=\"2\"/>`;\n  s += `<path d=\"${path}\" fill=\"none\" stroke=\"${C.accent}\" stroke-width=\"3\" stroke-linejoin=\"round\"/>`;\n  s += `<text x=\"${L + pw / 2}\" y=\"${H - 18}\" text-anchor=\"middle\" font-family=\"${FONT}\" font-size=\"14\" fill=\"${C.ink}\">${esc(f.x_label || 'Input')}</text>`;\n  s += `<text transform=\"rotate(-90)\" x=\"${-(T + ph / 2)}\" y=\"24\" text-anchor=\"middle\" font-family=\"${FONT}\" font-size=\"14\" fill=\"${C.ink}\">${esc(f.y_label || 'Output')}</text>`;\n  return s + '</svg>';\n}\n\nfunction barSvg(f) {\n  const labels = f.labels.slice(0, 6).map(l => String(l).slice(0, 16));\n  const vals = f.values.slice(0, labels.length).map(Number);\n  const L = 70, R = 20, T = 50, B = 70, pw = W - L - R, ph = H - T - B;\n  const max = Math.max(...vals, 1), slot = pw / labels.length, bw = Math.min(70, slot * 0.6);\n  let s = svgOpen(f.title);\n  s += `<line x1=\"${L}\" y1=\"${T}\" x2=\"${L}\" y2=\"${T + ph}\" stroke=\"${C.ink}\" stroke-width=\"2\"/>`;\n  s += `<line x1=\"${L}\" y1=\"${T + ph}\" x2=\"${L + pw}\" y2=\"${T + ph}\" stroke=\"${C.ink}\" stroke-width=\"2\"/>`;\n  labels.forEach((lab, i) => {\n    const h = (vals[i] / max) * ph, x = L + i * slot + (slot - bw) / 2, y = T + ph - h;\n    s += `<rect x=\"${x.toFixed(1)}\" y=\"${y.toFixed(1)}\" width=\"${bw.toFixed(1)}\" height=\"${h.toFixed(1)}\" rx=\"4\" fill=\"${C.accent}\"/>`;\n    s += `<text x=\"${(x + bw / 2).toFixed(1)}\" y=\"${(y - 6).toFixed(1)}\" text-anchor=\"middle\" font-family=\"${FONT}\" font-size=\"13\" fill=\"${C.ink}\">${vals[i]}</text>`;\n    wrapText(lab, 12).forEach((ln, j) => {\n      s += `<text x=\"${(x + bw / 2).toFixed(1)}\" y=\"${T + ph + 20 + j * 15}\" text-anchor=\"middle\" font-family=\"${FONT}\" font-size=\"13\" fill=\"${C.ink}\">${esc(ln)}</text>`;\n    });\n  });\n  s += `<text transform=\"rotate(-90)\" x=\"${-(T + ph / 2)}\" y=\"24\" text-anchor=\"middle\" font-family=\"${FONT}\" font-size=\"14\" fill=\"${C.ink}\">${esc(f.y_label || 'Relative score')}</text>`;\n  return s + '</svg>';\n}\n\nfunction validFigure(f) {\n  if (!f || typeof f !== 'object') return false;\n  if (f.type === 'flow') return Array.isArray(f.steps) && f.steps.length >= 2;\n  if (f.type === 'function') return typeof f.shape === 'string';\n  if (f.type === 'bar') return Array.isArray(f.labels) && Array.isArray(f.values) && f.labels.length >= 2 &&\n    f.values.length >= f.labels.length && f.values.slice(0, f.labels.length).every(v => Number.isFinite(Number(v)) && Number(v) >= 0);\n  return false;\n}\n\n// ---------- assemble ----------\nconst w = parseJson(wrap) || {};\nlet fig = w.figure;\nif (!validFigure(fig)) {\n  fig = { type: 'flow', title: 'Overview', caption: 'The main ideas in this post, in order.', steps: d.sections.map(s => s.heading.split(/\\s+/).slice(0, 4).join(' ')).slice(0, 4) };\n}\nfig.title = String(fig.title || 'Figure').slice(0, 60);\nlet svg, note = '';\nif (fig.type === 'flow') svg = flowSvg(fig);\nelse if (fig.type === 'function') { svg = fnSvg(fig); note = ' (Conceptual shape; axes are not to scale.)'; }\nelse { svg = barSvg(fig); note = ' (Illustrative relative values, not measured data.)'; }\nconst figureHtml = `<figure style=\"margin:28px 0\">${svg}<figcaption style=\"text-align:center;font-size:14px;color:${C.muted};margin-top:8px\">Figure: ${esc(fig.caption || fig.title)}${note}</figcaption></figure>`;\n\nconst takeaways = (Array.isArray(w.takeaways) && w.takeaways.length ? w.takeaways : d.sections.map(s => 'Review: ' + s.heading)).slice(0, 4);\nconst quiz = (Array.isArray(w.quiz) ? w.quiz : []).filter(q => q && q.question && q.answer).slice(0, 3);\n\nconst h2 = 'font-size:26px;line-height:1.3;margin:36px 0 12px;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:6px';\nconst words = d.sections.reduce((n, s) => n + s.text.split(/\\s+/).length, 0) + d.intro.split(/\\s+/).length;\nconst mins = Math.max(2, Math.round(words / 200));\n\nlet body = '';\nd.sections.forEach((s, i) => {\n  body += `<h2 id=\"s${i + 1}\" style=\"${h2}\">${esc(s.heading)}</h2>\\n${toHtml(s.text, s.heading)}\\n`;\n  if (i === 1 || (d.sections.length < 2 && i === 0)) body += figureHtml + '\\n';\n});\n\nconst toc = '<ol style=\"margin:0;padding-left:22px\">' +\n  d.sections.map((s, i) => `<li style=\"margin:3px 0\"><a href=\"#s${i + 1}\" style=\"color:${C.accent}\">${esc(s.heading)}</a></li>`).join('') + '</ol>';\n\nconst html = `<!-- Generated by n8n with model output. REVIEW FACTS BEFORE PUBLISHING. Sections missing: ${d.sections.filter(s => s.missing).length} -->\n<div style=\"max-width:760px;margin:0 auto;background:#ffffff;color:#1f2937;padding:22px;border-radius:12px;font-family:Georgia,'Times New Roman',serif;font-size:18px;line-height:1.75\">\n<div style=\"font-family:${FONT};font-size:14px;background:#eff6ff;border-left:4px solid ${C.accent};padding:10px 14px;border-radius:6px;margin-bottom:20px\">\n<strong>${esc(d.cat)}</strong> &nbsp;|&nbsp; Level: ${esc(d.level)} &nbsp;|&nbsp; About ${mins} min read</div>\n<p style=\"margin:0 0 16px;font-size:20px\"><em>${esc(d.intro)}</em></p>\n<!--more-->\n<div style=\"font-family:${FONT};font-size:15px;background:#f8fafc;border:1px solid #e2e8f0;padding:12px 16px;border-radius:8px;margin:20px 0\">\n<strong>In this post</strong>${toc}</div>\n${body}\n<h2 style=\"${h2}\">Key takeaways</h2>\n<ul style=\"margin:0 0 16px;padding-left:24px\">${takeaways.map(t => `<li style=\"margin:6px 0\">${inline(t)}</li>`).join('')}</ul>\n${quiz.length ? `<h2 style=\"${h2}\">Test yourself</h2>\n${quiz.map((q, i) => `<details style=\"margin:10px 0;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px\"><summary style=\"cursor:pointer;font-weight:bold\">${i + 1}. ${esc(q.question)}</summary><p style=\"margin:10px 0 0\">${inline(q.answer)}</p></details>`).join('\\n')}` : ''}\n<p style=\"font-family:${FONT};font-size:13px;color:${C.muted};margin-top:32px;border-top:1px solid #e2e8f0;padding-top:12px\">Educational content for learning purposes. Spotted a mistake? Please leave a comment so it can be corrected.</p>\n</div>`;\n\nconst baseLabels = [d.cat, ...(Array.isArray(w.labels) ? w.labels : []), ...(d.keywords || []).slice(0, 2)];\nconst labels = [...new Set(baseLabels.map(l => String(l).replace(/[,<>]/g, '').trim().slice(0, 30)).filter(Boolean))].slice(0, 5);\n\nreturn [{ json: { title: d.title, content: html, labels, description: d.description } }];"
+      },
+      "id": "8af7d04c-8ae2-4817-8d79-d1cd3a535701",
+      "name": "Build HTML1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Remembers the title (avoids repeats) and prints a handy edit link.\nconst sd = $getWorkflowStaticData('global');\nconst cfg = $('Config').first().json;\nconst b = $('Build HTML1').first().json;\nconst r = $input.first().json;\nsd.titles = [...(sd.titles || []), b.title].slice(-60);\nreturn [{ json: {\n  status: r.status || 'DRAFT',\n  title: r.title || b.title,\n  postId: r.id,\n  editUrl: `https://www.blogger.com/blog/post/edit/${cfg.blogId}/${r.id}`,\n  labels: b.labels\n}}];"
+      },
+      "id": "93ed93b6-fa87-4a3b-a3a0-23b29971ddbd",
+      "name": "Record Result1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1376,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://www.googleapis.com/blogger/v3/blogs/' + $('Config').first().json.blogId + '/posts?isDraft=true' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ kind: 'blogger#post', title: $json.title, content: $json.content, labels: $json.labels }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "685816ae-7d20-4b28-a7c4-f6e56c756657",
+      "name": "Blogger: Create Draft1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1152,
+        272
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googleOAuth2Api": {
+          "id": "ebP3mr4d0ziDMxQN",
+          "name": "Google account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "google_sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "google_sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "google_sheet": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "java request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama: Outline": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Parse Outline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "java request": {
+      "main": [
+        [
+          {
+            "node": "Ollama: Outline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Build HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Blogger: Create Draft": {
+      "main": [
+        [
+          {
+            "node": "Record Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build HTML": {
+      "main": [
+        [
+          {
+            "node": "Blogger: Create Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Outline": {
+      "main": [
+        [
+          {
+            "node": "Ollama: Section",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama: Section": {
+      "main": [
+        [
+          {
+            "node": "Assemble",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble": {
+      "main": [
+        [
+          {
+            "node": "Ollama: Wrap-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama: Wrap-up": {
+      "main": [
+        [
+          {
+            "node": "Build HTML1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build HTML1": {
+      "main": [
+        [
+          {
+            "node": "Blogger: Create Draft1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Blogger: Create Draft1": {
+      "main": [
+        [
+          {
+            "node": "Record Result1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "4e33fbc9-2191-4699-8441-f250384e4100",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "75b55027d251dcf092e6c2f371c04323f081c4e4172660c6957f1cda1c0b0d84"
+  },
+  "nodeGroups": [],
+  "id": "FM7Mp7owHn3w7Bjs",
+  "tags": []
+}
