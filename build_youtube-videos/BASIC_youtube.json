@@ -1,0 +1,318 @@
+{
+  "name": "BASIC_youtube",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -816,
+        -96
+      ],
+      "id": "c45501a1-875d-4702-bbef-1bb4b95ad1d2",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1grkMcwE9A4wWXAtybBg4np1fo21RGEYfKsj2CbISs-Q",
+          "mode": "list",
+          "cachedResultName": "topics",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1grkMcwE9A4wWXAtybBg4np1fo21RGEYfKsj2CbISs-Q/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1047850080,
+          "mode": "list",
+          "cachedResultName": "Sheet2",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1grkMcwE9A4wWXAtybBg4np1fo21RGEYfKsj2CbISs-Q/edit#gid=1047850080"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -592,
+        -96
+      ],
+      "id": "443147bb-5a1d-433f-940d-aaa91fa670a5",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "k6q37iAGYMatxBkO",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.ollamaUrl }}/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    model: \"qwen2.5:3b\",\n    stream: false,\n    format: \"json\",\n    prompt: `You are a professional educational YouTube scriptwriter.\n\nCreate a ${$json.duration_minutes}-minute educational video.\n\nTOPIC: ${$json.topic}\nLANGUAGE: ${$json.language}\n\nRULES:\n- Write approximately 130-150 spoken words per minute.\n- Start with a compelling hook.\n- Explain technical concepts clearly for beginners.\n- Define every technical term the first time it appears.\n- Include one concrete everyday analogy or worked example.\n- Divide the script into 7-10 scenes with short headings.\n- Make narration flow naturally between scenes.\n- Include an introduction, main explanation, example, and recap.\n- Use only facts you are confident about.\n- Do not invent statistics, dates, or specifications.\n- Avoid repetitive explanations and unnecessary filler.\n- Write narration suitable for text-to-speech.\n- Do not include visual instructions inside narration.\n\nOUTPUT:\nReturn valid JSON only, with this structure:\n{\n  \"title\": \"Video title\",\n  \"description\": \"Video description\",\n  \"scenes\": [\n    {\n      \"heading\": \"Scene heading\",\n      \"narration\": \"Spoken narration for this scene\"\n    }\n  ]\n}\n\nDo not include Markdown fences or any text outside the JSON.`\n  }\n}}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "40dcbea5-b7c8-4198-ac96-bc0cddac64f9",
+      "name": "Ollama: Outline",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        80,
+        -96
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bea81f04-bc27-448b-a903-98d28e3c8524",
+              "name": "topic",
+              "value": "={{ $json.TOPIC }}",
+              "type": "string"
+            },
+            {
+              "id": "06ccb651-fe67-40a3-a53d-af342bb444ff",
+              "name": "language",
+              "value": "English",
+              "type": "string"
+            },
+            {
+              "id": "c5c4d655-26bc-476a-a90e-87a042b5fb48",
+              "name": "duration_minutes",
+              "value": "5 ",
+              "type": "string"
+            },
+            {
+              "id": "ffe9cdc7-e3bd-4fdd-9865-a775fa08e060",
+              "name": "video_style",
+              "value": "educational",
+              "type": "string"
+            },
+            {
+              "id": "432cf4fd-6460-451b-a5c3-ed22b080e53c",
+              "name": "model",
+              "value": "qwen2.5:3b",
+              "type": "string"
+            },
+            {
+              "id": "4eadde4d-6c2a-4431-8387-8a213f790a63",
+              "name": "ollamaUrl",
+              "value": "http://127.0.0.1:11434",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -368,
+        -96
+      ],
+      "id": "b7646dd4-ee65-4172-8fa3-641c5afb6020",
+      "name": "Config"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over input items and add a new field called 'myNewField' to the JSON of each one\nfor (const item of $input.all()) {\n  item.json.myNewField = 1;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        -96
+      ],
+      "id": "8b048019-1cb9-4650-809d-b1e76cca9168",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8766/",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  job_id: $('Code in JavaScript1').first().json.job_id,\n  text: $('Code in JavaScript1').first().json.narration\n}) }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "5d014fb1-108a-440f-b1c3-167a28dce414",
+      "name": "TTS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        624,
+        -96
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": " http://127.0.0.1:8767",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({}) }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "9f25c4d3-67e6-4bb0-aab2-2cdb2757ac50",
+      "name": "Rendering ",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        816,
+        -96
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "mode": "each",
+        "options": {
+          "fileName": "scenes.json"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        -96
+      ],
+      "id": "065ed31d-8c11-48d2-8acc-cee37b508bea",
+      "name": "Convert to File1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst raw = $input.first().json.response;\nif (!raw) throw new Error('Ollama returned no response');\n\nlet script;\ntry {\n  script = JSON.parse(raw);\n} catch (e) {\n  script = JSON.parse(raw.replace(/```json|```/g, '').trim());\n}\n\nif (!Array.isArray(script.scenes) || script.scenes.length === 0) {\n  throw new Error('No scenes found: ' + raw.slice(0, 300));\n}\n\nconst scenes = script.scenes.map((s, i) => {\n  const narration = String(s.narration ?? '').trim();\n  if (!narration) throw new Error(`Scene ${i + 1} has no narration`);\n  return {\n    id: i + 1,\n    heading: s.heading ?? `Scene ${i + 1}`,\n    narration,\n    visual_query: String(s.visual_query ?? cfg.topic).trim(),\n  };\n});\n\nconst narration = scenes.map(s => s.narration).join('\\n\\n');\nconst wordCount = narration.split(/\\s+/).length;\nconst expectedWords = Number(cfg.duration_minutes) * 140;\n\nreturn [{\n  json: {\n    job_id: cfg.job_id,\n    topic: cfg.topic,\n    title: script.title || cfg.topic,\n    description: script.description || '',\n    scenes,\n    scene_count: scenes.length,\n    narration,\n    word_count: wordCount,\n    too_short: wordCount < expectedWords * 0.6,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        -96
+      ],
+      "id": "134e8df7-a4e2-42c1-8582-d1f2e6295ba3",
+      "name": "Code in JavaScript1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama: Outline": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Ollama: Outline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TTS": {
+      "main": [
+        [
+          {
+            "node": "Rendering ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Convert to File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File1": {
+      "main": [
+        [
+          {
+            "node": "TTS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "7e5a74da-dc5f-4421-8023-bfba128239d5",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "75b55027d251dcf092e6c2f371c04323f081c4e4172660c6957f1cda1c0b0d84"
+  },
+  "nodeGroups": [],
+  "id": "PJikjYhKJSNvQyQq",
+  "tags": []
+}
